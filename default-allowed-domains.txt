@@ -1,0 +1,33 @@
+# Default domains devbox VMs may reach through the squid proxy.
+# A leading dot matches the domain and all its subdomains.
+# Don't edit this for your own needs: add or deny domains in ~/.config/devbox/domains.txt
+# (or with: devbox allow <domain> / devbox deny <domain>), which is merged with this list.
+
+# Claude Code / Anthropic (API, login, docs)
+.anthropic.com
+.claude.ai
+.claude.com
+
+# opencode (installer, upgrades) and its model catalogue
+.opencode.ai
+.models.dev
+
+# Rust toolchain, crates and docs
+.rust-lang.org
+.crates.io
+.docs.rs
+
+# Git over HTTPS, raw files, release assets
+.github.com
+.githubusercontent.com
+
+# Ubuntu packages
+.ubuntu.com
+
+# Snaps (store API and download CDN)
+.snapcraft.io
+.snapcraftcontent.com
+
+# Python packages (only if pip/venv is used for quick scripts)
+.pypi.org
+.pythonhosted.org
