@@ -46,6 +46,7 @@ OC_AUTH_PATH="/home/$HOST_USER/.local/share/opencode/auth.json"
 CONFIG_DIR="${DEVBOX_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/devbox}"
 DEFAULT_DOMAINS="$HERE/default-allowed-domains.txt"   # shipped with devbox
 USER_DOMAINS="$CONFIG_DIR/domains.txt"                # yours: extra allows, and denies
+DOMAIN_RE='^\.?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$'  # a domain-list entry, without "!"
 
 VM=""; PROJECT_DIR=""; CONSUMED=0
 
@@ -160,8 +161,7 @@ EOF
 
 write_domain_lists() { # allowed file, denied file
   ensure_user_domains
-  local re='^!?\.?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$'
-  local f line n out
+  local f line n out bad=()
   : >"$1"; : >"$2"
   for f in "$DEFAULT_DOMAINS" "$USER_DOMAINS"; do
     n=0
@@ -169,10 +169,15 @@ write_domain_lists() { # allowed file, denied file
       n=$((n + 1))
       line="${line%%#*}"; line="${line//[[:space:]]/}"; line="${line,,}"
       if [[ -z $line ]]; then continue; fi
-      [[ $line =~ $re ]] || die "$f:$n: not a domain: $line"
+      if [[ ! ${line#!} =~ $DOMAIN_RE ]]; then bad+=("$f:$n: $line"); continue; fi
       if [[ $line == '!'* ]]; then echo "${line#!}" >>"$2"; else echo "$line" >>"$1"; fi
     done <"$f"
   done
+  if [[ ${#bad[@]} -gt 0 ]]; then
+    warn "Not a domain (no scheme, path, port, wildcard or trailing dot):"
+    printf '      %s\n' "${bad[@]}" >&2
+    die "Delete or fix these lines, then run: devbox reload-proxy"
+  fi
   # .invalid (reserved, never resolves) keeps the deny list from being empty, which squid warns about.
   echo .invalid >>"$2"
   # squid drops one of two overlapping entries (a.b.com under .b.com), so keep only the widest.
@@ -539,8 +544,11 @@ cmd_allow_deny() { # allow|deny <domain>...: record in the user's file; one repl
   ensure_user_domains
   local d tmp
   for d in "$@"; do
+    d="${d,,}"
+    [[ .${d#.} =~ $DOMAIN_RE ]] || die "not a domain: $d (give a bare name like example.com: no scheme, path, port, wildcard or trailing dot)"
+  done
+  for d in "$@"; do
     d="${d,,}"; d=".${d#.}"
-    [[ $d =~ ^\.[a-z0-9][a-z0-9.-]*$ ]] || die "not a domain: ${d#.}"
     tmp="$(mktemp)"
     grep -vxF -e "$d" -e "!$d" "$USER_DOMAINS" >"$tmp" || true
     if [[ $mode == deny ]]; then d="!$d"; fi
